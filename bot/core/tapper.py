@@ -292,15 +292,15 @@ class Tapper:
                     else:
                         logger.info(f"{self.session_name} | Failed to verify task: {task_name}")
                         continue
-
-                logger.info(f"{self.session_name} | Attempting to claim task: {task_name}")
-                claim_response = await self.claim_task(http_client=http_client, task_id=task_id)
-                
-                if claim_response == {}:
-                    logger.info(f"{self.session_name} | Task successfully claimed: {task_name}")
-                else:
-                    error_message = claim_response.get('message', 'Unknown error') if claim_response else 'No response'
-                    logger.info(f"{self.session_name} | Failed to claim task: {task_name}. Reason: {error_message}")
+                if task_status == 1: 
+                    logger.info(f"{self.session_name} | Attempting to claim task: {task_name}")
+                    claim_response = await self.claim_task(http_client=http_client, task_id=task_id)
+                    
+                    if claim_response == {}:
+                        logger.info(f"{self.session_name} | Task successfully claimed: {task_name}")
+                    else:
+                        error_message = claim_response.get('message', 'Unknown error') if claim_response else 'No response'
+                        logger.info(f"{self.session_name} | Failed to claim task: {task_name}. Reason: {error_message}")
 
             task_progress = tasks.get("taskProgress", 0)
             while task_progress >= 3:
