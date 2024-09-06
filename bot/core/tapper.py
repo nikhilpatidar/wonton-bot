@@ -210,7 +210,7 @@ class Tapper:
                 if "The username is invalid" in str(e):
                     logger.error(f"{self.session_name} | (Task) Invalid username: {link}")
                     return False
-                raise
+                raise  # Re-raise if it's a different ValueError
 
             chat_username = chat.username if chat.username else link
             chat_id = chat.id
@@ -277,7 +277,7 @@ class Tapper:
                 task_status = task['status']
                 task_url = task.get('taskUrl', '')
 
-                if task_status == 0:
+                if task_status == 0:  # Not verified yet
                     if "Join" in task_name:
                         logger.info(f"{self.session_name} | Attempting to join and mute channel for task: {task_name}")
                         join_success = await self.join_and_mute_tg_channel(task_url)
@@ -287,22 +287,25 @@ class Tapper:
                     
                     logger.info(f"{self.session_name} | Verifying task: {task_name}")
                     verify_response = await self.verify_task(http_client=http_client, task_id=task_id)
-                    if verify_response and verify_response.get('success', False):
+                    if verify_response:
                         logger.info(f"{self.session_name} | Task verified: {task_name}")
                         await asyncio.sleep(5)
+                        task_status = 1
                     else:
                         logger.info(f"{self.session_name} | Failed to verify task: {task_name}")
                         continue
 
-                if task_status == 1:
+                if task_status == 1: 
                     logger.info(f"{self.session_name} | Attempting to claim task: {task_name}")
                     claim_response = await self.claim_task(http_client=http_client, task_id=task_id)
-                    
-                    if claim_response == {}:
+                    if claim_response and claim_response.get('success', False):
                         logger.info(f"{self.session_name} | Task successfully claimed: {task_name}")
                     else:
                         error_message = claim_response.get('message', 'Unknown error') if claim_response else 'No response'
                         logger.info(f"{self.session_name} | Failed to claim task: {task_name}. Reason: {error_message}")
+
+                elif task_status == 2:
+                    logger.info(f"{self.session_name} | Task already claimed: {task_name}")
 
             task_progress = tasks.get("taskProgress", 0)
             while task_progress >= 3:
