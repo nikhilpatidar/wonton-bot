@@ -175,6 +175,14 @@ class Tapper:
     async def claim_progress(self, http_client):
         return await self.make_request(http_client, "GET", "/task/claim-progress")
     
+    def log_received_items(self, items):
+        if items:
+            logger.info(f"{self.session_name} | Received the following items:")
+            for item in items:
+                logger.info(f"{self.session_name} | - {item['name']} (Farming Power: {item['farmingPower']}, Token Value: {item['tokenValue']})")
+        else:
+            logger.info(f"{self.session_name} | No items received")
+
     @error_handler
     async def claim_invite_reward(self, http_client):
         try:
@@ -183,8 +191,7 @@ class Tapper:
                 items = response['items']
                 if items:
                     logger.info(f"{self.session_name} | Successfully claimed invite reward")
-                    for item in items:
-                        logger.info(f"{self.session_name} | Received: {item['name']} (Farming Power: {item['farmingPower']})")
+                    self.log_received_items(items)
                     return True
                 else:
                     logger.info(f"{self.session_name} | No items received from invite reward")
@@ -195,7 +202,7 @@ class Tapper:
         except Exception as e:
             logger.error(f"{self.session_name} | Error claiming invite reward: {str(e)}")
             return False
-        
+
     @error_handler
     async def claim_task_progress(self, http_client):
         try:
@@ -204,8 +211,7 @@ class Tapper:
                 items = response['items']
                 if items:
                     logger.info(f"{self.session_name} | Successfully claimed task progress reward")
-                    for item in items:
-                        logger.info(f"{self.session_name} | Received: {item['name']} (Farming Power: {item['farmingPower']})")
+                    self.log_received_items(items)
                     return True
                 else:
                     logger.info(f"{self.session_name} | No items received from task progress reward")
