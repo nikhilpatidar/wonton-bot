@@ -190,17 +190,13 @@ class Tapper:
             if response and 'items' in response:
                 items = response['items']
                 if items:
-                    logger.info(f"{self.session_name} | Successfully claimed invite reward")
                     self.log_received_items(items)
                     return True
                 else:
-                    logger.info(f"{self.session_name} | No items received from invite reward")
                     return False
             else:
-                logger.info(f"{self.session_name} | No invite reward to claim or claim failed")
                 return False
         except Exception as e:
-            logger.error(f"{self.session_name} | Error claiming invite reward: {str(e)}")
             return False
 
     @error_handler
