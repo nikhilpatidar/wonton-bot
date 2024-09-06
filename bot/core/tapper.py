@@ -179,14 +179,42 @@ class Tapper:
     async def claim_invite_reward(self, http_client):
         try:
             response = await self.make_request(http_client, "POST", "/invite/claim-progress")
-            if response == {}:
-                logger.info(f"{self.session_name} | Successfully claimed invite reward")
-                return True
+            if response and 'items' in response:
+                items = response['items']
+                if items:
+                    logger.info(f"{self.session_name} | Successfully claimed invite reward")
+                    for item in items:
+                        logger.info(f"{self.session_name} | Received: {item['name']} (Farming Power: {item['farmingPower']})")
+                    return True
+                else:
+                    logger.info(f"{self.session_name} | No items received from invite reward")
+                    return False
             else:
                 logger.info(f"{self.session_name} | No invite reward to claim or claim failed")
                 return False
         except Exception as e:
             logger.error(f"{self.session_name} | Error claiming invite reward: {str(e)}")
+            return False
+        
+    @error_handler
+    async def claim_task_progress(self, http_client):
+        try:
+            response = await self.make_request(http_client, "GET", "/task/claim-progress")
+            if response and 'items' in response:
+                items = response['items']
+                if items:
+                    logger.info(f"{self.session_name} | Successfully claimed task progress reward")
+                    for item in items:
+                        logger.info(f"{self.session_name} | Received: {item['name']} (Farming Power: {item['farmingPower']})")
+                    return True
+                else:
+                    logger.info(f"{self.session_name} | No items received from task progress reward")
+                    return False
+            else:
+                logger.info(f"{self.session_name} | No task progress reward to claim or claim failed")
+                return False
+        except Exception as e:
+            logger.error(f"{self.session_name} | Error claiming task progress reward: {str(e)}")
             return False
     
     def format_time_until(self, target_timestamp):
@@ -304,13 +332,10 @@ class Tapper:
 
             task_progress = tasks.get("taskProgress", 0)
             while task_progress >= 3:
-                claim_progress_response = await self.claim_progress(http_client=http_client)
-                if claim_progress_response == {}:
-                    logger.info(f"{self.session_name} | Successfully claimed progress reward")
+                claim_result = await self.claim_task_progress(http_client=http_client)
+                if claim_result:
                     task_progress -= 3 
                 else:
-                    error_message = claim_progress_response.get('message', 'Unknown error') if claim_progress_response else 'No response'
-                    logger.info(f"{self.session_name} | Failed to claim progress reward. Reason: {error_message}")
                     break
 
     async def run(self) -> None:
