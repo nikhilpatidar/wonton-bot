@@ -88,7 +88,7 @@ python3 main.py
 ```shell
 ~/wonton-bot >>> python3 main.py --action (1/2)
 # Или
-~/Tomarket >>> python3 main.py -a (1/2)
+~/wonton-bot >>> python3 main.py -a (1/2)
 
 # 1 - Запускает кликер
 # 2 - Создает сессию
