@@ -10,7 +10,7 @@ import aiohttp
 from aiohttp_proxy import ProxyConnector
 from better_proxy import Proxy
 from pyrogram import Client
-from pyrogram.errors import Unauthorized, UserDeactivated, AuthKeyUnregistered, FloodWait, UserNotParticipant, FloodWait
+from pyrogram.errors import Unauthorized, UserDeactivated, AuthKeyUnregistered, FloodWait, UserNotParticipant, FloodWait, UsernameInvalid
 from pyrogram.raw.functions.messages import RequestAppWebView
 from pyrogram.raw.types import InputBotAppShortName, InputPeerNotifySettings, InputNotifyPeer
 from pyrogram.raw.functions.account import UpdateNotifySettings
@@ -201,7 +201,17 @@ class Tapper:
                 return False
 
         try:
-            chat = await self.tg_client.get_chat(link)
+            try:
+                chat = await self.tg_client.get_chat(link)
+            except UsernameInvalid:
+                logger.error(f"{self.session_name} | (Task) Invalid username: {link}")
+                return False
+            except ValueError as e:
+                if "The username is invalid" in str(e):
+                    logger.error(f"{self.session_name} | (Task) Invalid username: {link}")
+                    return False
+                raise  # Re-raise if it's a different ValueError
+
             chat_username = chat.username if chat.username else link
             chat_id = chat.id
 
@@ -216,6 +226,9 @@ class Tapper:
                 except FloodWait as e:
                     logger.warning(f"{self.session_name} | FloodWait error when joining {link}. Waiting for {e.value} seconds.")
                     await asyncio.sleep(e.value)
+                    return False
+                except UsernameInvalid:
+                    logger.error(f"{self.session_name} | (Task) Invalid username when joining: {link}")
                     return False
                 except Exception as e:
                     logger.error(f"{self.session_name} | Failed to join channel {link}: {str(e)}")
@@ -265,7 +278,7 @@ class Tapper:
                 task_url = task.get('taskUrl', '')
 
                 if task_status == 0:  # Not verified yet
-                    if "Join" in task_name or "Boost" in task_name:
+                    if "Join" in task_name:
                         logger.info(f"{self.session_name} | Attempting to join and mute channel for task: {task_name}")
                         join_success = await self.join_and_mute_tg_channel(task_url)
                         if not join_success:
@@ -365,6 +378,9 @@ class Tapper:
                     if claim_daily:
                         logger.info(f"{self.session_name} | Claimed daily reward: {claim_daily}")
 
+                if settings.AUTO_TASK:
+                    await self.handle_tasks(http_client=http_client)
+
                 if settings.AUTO_CLAIM_INVITE_REWARDS:
                     if user_data.get('inviteClaimed', 1) == 0:
                         logger.info(f"{self.session_name} | Invite reward available. Attempting to claim...")
@@ -375,8 +391,9 @@ class Tapper:
                             logger.info(f"{self.session_name} | Failed to claim invite reward")
 
                 if settings.AUTO_PLAY_GAME and ticket_count > 0:
-                    logger.info(f"{self.session_name} | Start ticket games...")
-                    for _ in range(ticket_count):
+                    logger.info(f"{self.session_name} | Start ticket games... Total games: {ticket_count}")
+                    for game_number in range(1, ticket_count + 1):
+                        logger.info(f"{self.session_name} | Playing game {game_number}/{ticket_count}")
                         play_game = await self.play_game(http_client=http_client)
                         if play_game:
                             sleep_before_claim = randint(15, 20)
@@ -384,12 +401,19 @@ class Tapper:
                             points = randint(settings.POINTS_COUNT[0], settings.POINTS_COUNT[1])
                             claim_game = await self.claim_game(http_client=http_client, points=points)
                             if claim_game:
-                                logger.info(f"{self.session_name} | Game claimed. Points: {points}")
+                                logger.info(f"{self.session_name} | Game {game_number}/{ticket_count} claimed. Points: {points}")
+                                
+                                # Get updated user data to show new balance
+                                user_data = await self.get_user_data(http_client=http_client)
+                                new_balance = user_data.get('tokenBalance', '0')
+                                logger.info(f"{self.session_name} | Current balance after game {game_number}: <light-red>{new_balance}</light-red>")
+                                
                                 sleep_after_claim = randint(1, 10)
                                 await asyncio.sleep(sleep_after_claim)
-
-                if settings.AUTO_TASK:
-                    await self.handle_tasks(http_client=http_client)
+                            else:
+                                logger.info(f"{self.session_name} | Failed to claim game {game_number}/{ticket_count}")
+                        else:
+                            logger.info(f"{self.session_name} | Failed to start game {game_number}/{ticket_count}")
 
                 farming_status = await self.get_farming_status(http_client=http_client)
                 current_time = datetime.now(timezone.utc)
