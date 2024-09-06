@@ -175,6 +175,20 @@ class Tapper:
     async def claim_progress(self, http_client):
         return await self.make_request(http_client, "GET", "/task/claim-progress")
     
+    @error_handler
+    async def claim_invite_reward(self, http_client):
+        try:
+            response = await self.make_request(http_client, "POST", "/invite/claim-progress")
+            if response == {}:
+                logger.info(f"{self.session_name} | Successfully claimed invite reward")
+                return True
+            else:
+                logger.info(f"{self.session_name} | No invite reward to claim or claim failed")
+                return False
+        except Exception as e:
+            logger.error(f"{self.session_name} | Error claiming invite reward: {str(e)}")
+            return False
+    
     def format_time_until(self, target_timestamp):
         now = datetime.now(timezone.utc)
         target_time = datetime.fromtimestamp(target_timestamp, timezone.utc)
@@ -253,21 +267,6 @@ class Tapper:
             if self.tg_client.is_connected:
                 await self.tg_client.disconnect()
 
-    async def claim_invite_reward(self, http_client):
-        try:
-            response = await self.make_request(http_client, "POST", "/invite/claim-progress")
-            if response and response.get('success'):
-                claimed_items = response.get('items', [])
-                for item in claimed_items:
-                    logger.info(f"{self.session_name} | Claimed invite reward: {item['name']} (Farming Power: {item['farmingPower']})")
-                return True
-            else:
-                logger.info(f"{self.session_name} | No invite reward to claim or claim failed")
-                return False
-        except Exception as e:
-            logger.error(f"{self.session_name} | Error claiming invite reward: {str(e)}")
-            return False
-
     async def handle_tasks(self, http_client):
         tasks = await self.get_tasks(http_client=http_client)
         if tasks and tasks.get("tasks"):
@@ -277,7 +276,7 @@ class Tapper:
                 task_status = task['status']
                 task_url = task.get('taskUrl', '')
 
-                if task_status == 0:  # Not verified yet
+                if task_status == 0: 
                     if "Join" in task_name:
                         logger.info(f"{self.session_name} | Attempting to join and mute channel for task: {task_name}")
                         join_success = await self.join_and_mute_tg_channel(task_url)
@@ -293,23 +292,24 @@ class Tapper:
                     else:
                         logger.info(f"{self.session_name} | Failed to verify task: {task_name}")
                         continue
-                if task_status == 1:
-                    logger.info(f"{self.session_name} | Attempting to claim task: {task_name}")
-                    claim_response = await self.claim_task(http_client=http_client, task_id=task_id)
-                    if claim_response == {}:
-                        logger.info(f"{self.session_name} | Task successfully claimed: {task_name}")
-                    else:
-                        error_message = claim_response.get('message', 'Unknown error') if claim_response else 'No response'
-                        logger.info(f"{self.session_name} | Failed to claim task: {task_name}. Reason: {error_message}")
+
+                logger.info(f"{self.session_name} | Attempting to claim task: {task_name}")
+                claim_response = await self.claim_task(http_client=http_client, task_id=task_id)
+                
+                if claim_response == {}:
+                    logger.info(f"{self.session_name} | Task successfully claimed: {task_name}")
+                else:
+                    error_message = claim_response.get('message', 'Unknown error') if claim_response else 'No response'
+                    logger.info(f"{self.session_name} | Failed to claim task: {task_name}. Reason: {error_message}")
 
             task_progress = tasks.get("taskProgress", 0)
             while task_progress >= 3:
-                claim_progress = await self.claim_progress(http_client=http_client)
-                if claim_progress and claim_progress.get('success', False):
+                claim_progress_response = await self.claim_progress(http_client=http_client)
+                if claim_progress_response == {}:
                     logger.info(f"{self.session_name} | Successfully claimed progress reward")
                     task_progress -= 3 
                 else:
-                    error_message = claim_progress.get('message', 'Unknown error') if claim_progress else 'No response'
+                    error_message = claim_progress_response.get('message', 'Unknown error') if claim_progress_response else 'No response'
                     logger.info(f"{self.session_name} | Failed to claim progress reward. Reason: {error_message}")
                     break
 
@@ -397,8 +397,6 @@ class Tapper:
                             claim_game = await self.claim_game(http_client=http_client, points=points)
                             if claim_game:
                                 logger.info(f"{self.session_name} | Game {game_number}/{ticket_count} claimed. Points: {points}")
-                                
-                                # Get updated user data to show new balance
                                 user_data = await self.get_user_data(http_client=http_client)
                                 new_balance = user_data.get('tokenBalance', '0')
                                 logger.info(f"{self.session_name} | Current balance after game {game_number}: <light-red>{new_balance}</light-red>")
